@@ -4,11 +4,20 @@ import html
 from bs4 import BeautifulSoup # To parse html content when using the data scheme
 
 class URL:
+    open_sockets = {}
     def __init__(self, url):
-        if "://" not in url:
+        self.is_view_source = False
+
+        # Handle view-source scheme
+        if url.startswith("view-source"):
+            self.is_view_source = True
+            url = url[len("view-source:"):] # Remove view-source prefix
+
+        if "://" not in url: 
             self.scheme, url = url.split(":", 1)
-        else:
+        else: 
             self.scheme, url = url.split("://", 1)
+
         assert self.scheme in ["http", "https", "file", "data"]
 
         if self.scheme == "file":
@@ -16,12 +25,14 @@ class URL:
             self.host = None    
             self.port = None
             self.path = url 
+
         elif self.scheme == "data":
             # For data html/text URLs
             self.host = None
             self.port = None
             self.path = None
-            self.mediaType, self.dataContent = url.split(",", 1) 
+            self.mediaType, self.dataContent = url.split(",", 1)
+
         else: 
             # For HTTP/HTTPS URLs
             if self.scheme == "http":
@@ -38,91 +49,131 @@ class URL:
         
     def request(self):
         if self.scheme == "file":
-            # Handle file URLs - just read the local file
-            try:
-                with open(self.path, 'r') as f:
-                    return f.read()
-            except FileNotFoundError:
-                return f"Error: File not found: {self.path}"
-            except Exception as e:
-                return f"Error reading file: {e}"
+            return self.handle_file_request()
             
-        if self.scheme == "data":
-            # Handle data URLs - display content to user
-            if self.mediaType == "text/html":
-                soup = BeautifulSoup(self.dataContent, "html.parser")
-                return soup.prettify()
-            elif self.mediaType == "text/plain":
-                return self.dataContent
-            else:
-                return f"Unsupported media type: {self.mediaType}"
+        elif self.scheme == "data":
+            return self.handle_data_request()
         
-        # Handle HTTP/HTTPS URLs - use socket connection
-        s = socket.socket(
-            family=socket.AF_INET, 
-            type=socket.SOCK_STREAM, 
-            proto=socket.IPPROTO_TCP,
-        )
-        s.connect((self.host, self.port))
-        if self.scheme == "https":
-            ctx = ssl.create_default_context()
-            s = ctx.wrap_socket(s, server_hostname=self.host)
+        else:
+            # Handling HTTP/HTTPS requests
+            s = self.get_socket()
 
+            request = self.create_http_request()
+            
+            s.send(request.encode("utf8"))
+
+            response = s.makefile("r", encoding="utf8", newline="\r\n")
+            statusline = response.readline()
+            version, status, explaination = statusline.split(" ", 2)
+            response_headers = {}
+
+            while True:
+                line = response.readline()
+                if line == "\r\n":
+                    break
+                header, value = line.split(":", 1)
+                response_headers[header.casefold()] = value.strip() 
+
+            assert "transfer-encoding" not in response_headers
+            assert "content-encoding" not in response_headers
+            
+            # Read only as many bytes specified by header
+            content_length = int(response_headers.get("content-length", 0))
+            content = response.read(content_length)
+
+            # Close socket if specified by header 
+            if response_headers.get("connection") == "close":
+                key = (self.host, self.port)
+                if key in URL.open_sockets:
+                    del self.open_sockets[key]
+                s.close()
+
+            return content
+    
+    def handle_file_request(self):
+        # Handle file requests, just read the local file
+        try:
+            with open(self.path, 'r') as f:
+                return f.read()
+        except FileNotFoundError:
+            return f"Error: File not found: {self.path}"
+        except Exception as e:
+            return f"Error reading file: {e}"
+    
+    def handle_data_request(self):
+        # Handle data URLs - display content to user
+        if self.mediaType == "text/html":
+            soup = BeautifulSoup(self.dataContent, "html.parser")
+            return soup.prettify()
+        elif self.mediaType == "text/plain":
+            return self.dataContent
+        else:
+            return f"Unsupported media type: {self.mediaType}"
+    
+    def get_socket(self):
+        # Handle HTTP/HTTPS URLs - use socket connection
+        key = (self.host, self.port)
+
+        if key in URL.open_sockets:
+            s = URL.open_sockets[key]
+        else:
+            s = socket.socket(
+                family=socket.AF_INET, 
+                type=socket.SOCK_STREAM, 
+                proto=socket.IPPROTO_TCP,
+            )
+            
+            s.connect((self.host, self.port))
+
+            if self.scheme == "https":
+                ctx = ssl.create_default_context()
+                s = ctx.wrap_socket(s, server_hostname=self.host)
+            URL.open_sockets[key] = s
+
+        return s
+
+    def create_http_request(self):
         request = f"GET {self.path} HTTP/1.1\r\n"
+
         headers = {
             "Host": self.host,
             "User-Agent": "MyBrowser",
-            "Connection": "close",
         }
 
         for key,value in headers.items():
             request += f"{key}: {value}\r\n"
         request += "\r\n"
+
+        return request
         
-        s.send(request.encode("utf8"))
-
-        response = s.makefile("r", encoding="utf8", newline="\r\n")
-        statusline = response.readline()
-        version, status, explaination = statusline.split(" ", 2)
-        response_headers = {}
-
-        while True:
-            line = response.readline()
-            if line == "\r\n":
-                break
-            header, value = line.split(":", 1)
-            response_headers[header.casefold()] = value.strip() 
-
-        assert "transfer-encoding" not in response_headers
-        assert "content-encoding" not in response_headers
-
-        content = response.read()
-        s.close()
-        return content
     
-def show(body):
-    in_tag = False
-    text_only = ""
+def show(body, view_source=False):
 
-    for c in body:
-        if c == "<":
-            in_tag = True
-        elif c == ">":
-            in_tag = False
-        elif not in_tag:
-            text_only += c
-            
-    decoded_text = html.unescape(text_only)
-    print(decoded_text, end="")    
+    if(view_source):
+        print(body, end="")
+    else:
+        in_tag = False
+        text_only = ""
+
+        for c in body:
+            if c == "<":
+                in_tag = True
+            elif c == ">":
+                in_tag = False
+            elif not in_tag:
+                text_only += c
+                
+        decoded_text = html.unescape(text_only)
+        print(decoded_text, end="")    
 
 
 def load(url):
     body = url.request()
-    show(body)
+    show(body, url.is_view_source)
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 1 and sys.argv[1]:  # Check if URL is not empty
         url = sys.argv[1]
     else:
         url = "file:///home/kevinpe/Documents/web-browser/homepage.html"
