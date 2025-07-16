@@ -4,6 +4,7 @@ import html
 import time
 import gzip
 from tkinter import *
+from tkinter import ttk
 from bs4 import BeautifulSoup # To parse html content when using the data scheme
 
 class URL:
@@ -265,24 +266,45 @@ SCROLL_STEP = 50
 class Browser:
 
     def __init__(self):
-        self.scroll = 0
         self.window = Tk()
+        self.window.geometry(f"{WIDTH}x{HEIGHT}")
+
+        self.text=""
+        self.display_list = []
+
+        self.frame = Frame(self.window)
+        self.frame.pack(fill=BOTH, expand=True)
+
+        self.canvas = Canvas(
+            self.frame,
+            width=WIDTH,
+            height=HEIGHT,
+            yscrollincrement=SCROLL_STEP
+        )
+        self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
+
+        self.scrollbar = ttk.Scrollbar(
+            self.frame,
+            orient=VERTICAL,
+            command=self.on_scrollbar
+        )
+        self.scrollbar.pack(side=RIGHT, fill=Y)
+
+        self.canvas.config(yscrollcommand=self.scrollbar.set)
+
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
         self.window.bind("<Button-4>", self.scrollup)
         self.window.bind("<Button-5>", self.scrolldown)
         self.window.bind("<Configure>", self.resize)
-        self.scrollbar = Scrollbar(
-            self.window,
-            bg="black",
-            troughcolor="grey")
-        self.scrollbar.pack(side=RIGHT, fill=Y)
-        self.canvas = Canvas(
-            self.window,
-            width=WIDTH,
-            height=HEIGHT,
-        )
-        self.canvas.pack(fill="both", expand=True)
+
+    def total_height(self):
+        if self.display_list:
+            return self.display_list[-1][1] + VSTEP
+        return HEIGHT
+
+    def on_scrollbar(self, *args):
+        self.canvas.yview(*args)
 
     def load(self, url):
         body = url.request()
@@ -292,28 +314,24 @@ class Browser:
         self.draw()
     
     def draw(self):
-        for x, y, c in self.display_list:
-            if y > self.scroll + HEIGHT: continue
-            if y + VSTEP < self.scroll: continue
-            self.canvas.create_text(x, y - self.scroll, text=c)
-
-    def scrollup(self, e):
-        if self.scroll - SCROLL_STEP >= 0:
-            self.scroll -= SCROLL_STEP
-            self.canvas.delete("all")
-            self.draw()
-    
-    def scrolldown(self, e):
-        self.scroll += SCROLL_STEP
         self.canvas.delete("all")
-        self.draw()
+        scroll_y = self.canvas.canvasy(0)
+        for x, y, c in self.display_list:
+            if y + VSTEP >= scroll_y and y <= scroll_y + HEIGHT:
+                self.canvas.create_text(x, y, text=c, anchor="nw")
+        self.canvas.config(scrollregion=(0, 0, WIDTH, self.total_height()))
+
+    def scrollup(self, _):
+        self.canvas.yview_scroll(-1, "units") 
+    
+    def scrolldown(self, _):
+        self.canvas.yview_scroll(1, "units") 
 
     def resize(self, e):
         global WIDTH, HEIGHT
         WIDTH = e.width
         HEIGHT = e.height
-
-        self.canvas.delete("all")
+        self.canvas.config(width=WIDTH, height=HEIGHT)
         self.display_list = layout(self.text)
         self.draw()
         
