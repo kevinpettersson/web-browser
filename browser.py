@@ -5,7 +5,10 @@ import time
 import gzip
 from tkinter import *
 from tkinter import ttk
-from bs4 import BeautifulSoup # To parse html content when using the data scheme
+from bs4 import BeautifulSoup 
+import emoji
+import os
+from PIL import Image, ImageTk
 
 class URL:
     open_sockets = {}
@@ -275,6 +278,13 @@ class Browser:
         self.frame = Frame(self.window)
         self.frame.pack(fill=BOTH, expand=True)
 
+        self.scrollbar = ttk.Scrollbar(
+            self.frame,
+            orient=VERTICAL,
+            command=self.on_scrollbar
+        )
+        self.scrollbar.pack(side=RIGHT, fill=Y)
+
         self.canvas = Canvas(
             self.frame,
             width=WIDTH,
@@ -282,13 +292,6 @@ class Browser:
             yscrollincrement=SCROLL_STEP
         )
         self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
-
-        self.scrollbar = ttk.Scrollbar(
-            self.frame,
-            orient=VERTICAL,
-            command=self.on_scrollbar
-        )
-        self.scrollbar.pack(side=RIGHT, fill=Y)
 
         self.canvas.config(yscrollcommand=self.scrollbar.set)
 
@@ -298,6 +301,8 @@ class Browser:
         self.window.bind("<Button-5>", self.scrolldown)
         self.window.bind("<Configure>", self.resize)
 
+        self.emoji_cache = {}
+
     def total_height(self):
         if self.display_list:
             return self.display_list[-1][1] + VSTEP
@@ -305,11 +310,25 @@ class Browser:
 
     def on_scrollbar(self, *args):
         self.canvas.yview(*args)
+    
+    def get_emoji(self, char):
+        filename = "-".join(f"{ord(c):x}" for c in char) + ".png"
+        path = os.path.join("emojis", filename)
+
+        if not os.path.exists(path):
+            return None
+        elif path not in self.emoji_cache: 
+            image = Image.open(path)
+            resized_image = image.resize((16, 16))
+            img = ImageTk.PhotoImage(resized_image)
+            self.emoji_cache[path] = img
+        return self.emoji_cache[path]
+
 
     def load(self, url):
         body = url.request()
         cleaned_body = lex(body, url.is_view_source)
-        self.text = cleaned_body # Store body inside instance variable for future use (resize).
+        self.text = cleaned_body
         self.display_list = layout(cleaned_body)
         self.draw()
     
@@ -318,7 +337,11 @@ class Browser:
         scroll_y = self.canvas.canvasy(0)
         for x, y, c in self.display_list:
             if y + VSTEP >= scroll_y and y <= scroll_y + HEIGHT:
-                self.canvas.create_text(x, y, text=c, anchor="nw")
+                if emoji.is_emoji(c):
+                    emoji_ = self.get_emoji(c)
+                    self.canvas.create_image(x, y, image=emoji_, anchor="nw", )
+                else:
+                    self.canvas.create_text(x, y, text=c, anchor="nw")
         self.canvas.config(scrollregion=(0, 0, WIDTH, self.total_height()))
 
     def scrollup(self, _):
@@ -365,7 +388,6 @@ def layout(text):
         if cursor_x >= WIDTH - HSTEP:
             cursor_y += VSTEP
             cursor_x = HSTEP
-
     return display_list
 
 
