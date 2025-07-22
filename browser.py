@@ -4,7 +4,7 @@ import html
 import time
 import gzip
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, font
 from bs4 import BeautifulSoup 
 import emoji
 import os
@@ -21,13 +21,15 @@ class URL:
         if url.startswith("view-source"):
             self.is_view_source = True
             url = url[len("view-source:"):] # Remove view-source prefix
+        try:
+            if "://" not in url: 
+                self.scheme, url = url.split(":", 1)
+            else: 
+                self.scheme, url = url.split("://", 1)
+        except:
+            self.set_about_blank()
 
-        if "://" not in url: 
-            self.scheme, url = url.split(":", 1)
-        else: 
-            self.scheme, url = url.split("://", 1)
-
-        assert self.scheme in ["http", "https", "file", "data"]
+        assert self.scheme in ["http", "https", "file", "data", "about"]
 
         if self.scheme == "file":
             # For file URLs - no host, no port, just file path
@@ -41,8 +43,8 @@ class URL:
             self.port = None
             self.path = None
             self.mediaType, self.dataContent = url.split(",", 1)
-
-        else: 
+        
+        elif self.scheme == "http" or self.scheme == "https":
             # For HTTP/HTTPS URLs
             if self.scheme == "http":
                 self.port = 80
@@ -55,102 +57,115 @@ class URL:
             if ":" in self.host:
                 self.host, port = self.host.split(":", 1)
                 self.port = int(port)
+    
+    def set_about_blank(self):
+        self.scheme = "about"
+        self.path = "blank"
+        self.host = None
+        self.port = None
         
     def request(self, redirect_limit=5):
-        if redirect_limit <= 0:
-            return "Error: Too many redirects"
-        
-        if self.scheme == "file":
-            return self.handle_file_request()
+        try:
+            if redirect_limit <= 0:
+                return "Error: Too many redirects"
             
-        elif self.scheme == "data":
-            return self.handle_data_request()
-        
-        else:
-            # Handling HTTP/HTTPS requests
-            cache_key = str(self)
-            cached = URL.response_cache.get(cache_key)
-
-            if cached:
-                if time.time() < cached["expires"]:
-                    print("Returning cached content")
-                    return cached["content"]
-                else:
-                    print("Time expired, removing cached object")
-                    del URL.response_cache[cache_key]
-
-            s = self.get_socket()
-            s.settimeout(10.0)
-
-            request = self.create_http_request()
+            if self.scheme == "file":
+                return self.handle_file_request()
+                
+            elif self.scheme == "data":
+                return self.handle_data_request()
             
-            s.send(request.encode("utf8"))
-
-            response = s.makefile("rb", newline=b"\r\n")
-            statusline = response.readline().decode("utf-8")
-            _, status, _ = statusline.split(" ", 2)
-            response_headers = {}
-
-            while True:
-                line = response.readline()
-                if line in (b"\r\n", b"\n", b""):
-                    break
-                header_line = line.decode("utf-8")
-                header, value = header_line.split(":", 1)
-                response_headers[header.casefold()] = value.strip() 
-
-            # Handle status codes 3xx (Redirects)
-            if 300 <= int(status) < 400:
-                redirect = response_headers.get("location")
-                if redirect is not None:
-                    print(f"Redirecting to: {redirect}")
-                    return self.handle_redirects(redirect, redirect_limit-1)
-
-            # Handle reading of data (creating content) 
-            if response_headers.get("transfer-encoding") == "chunked":
-                content = self.handle_transfer_encoding(response)
-            elif "content-length" in response_headers:
-                content_length = int(response_headers.get("content-length"))
-                content = response.read(content_length)
+            elif self.scheme == "about" and self.path == "blank":
+                return ""
+            
             else:
+                # Handling HTTP/HTTPS requests
+                cache_key = str(self)
+                cached = URL.response_cache.get(cache_key)
+
+                if cached:
+                    if time.time() < cached["expires"]:
+                        print("Returning cached content")
+                        return cached["content"]
+                    else:
+                        print("Time expired, removing cached object")
+                        del URL.response_cache[cache_key]
+
+                s = self.get_socket()
                 s.settimeout(10.0)
-                content = response.read()
 
-            if response_headers.get("content-encoding", "").lower() == "gzip":
-                try:
-                    content = gzip.decompress(content)
-                except Exception as e:
-                    return f"Error decompressing gzip content: {e}"
+                request = self.create_http_request()
+                
+                s.send(request.encode("utf8"))
 
-            if isinstance(content, bytes):
-                try:
-                    content = content.decode("utf-8")
-                except UnicodeDecodeError:
+                response = s.makefile("rb", newline=b"\r\n")
+                statusline = response.readline().decode("utf-8")
+                _, status, _ = statusline.split(" ", 2)
+                response_headers = {}
+
+                while True:
+                    line = response.readline()
+                    if line in (b"\r\n", b"\n", b""):
+                        break
+                    header_line = line.decode("utf-8")
+                    header, value = header_line.split(":", 1)
+                    response_headers[header.casefold()] = value.strip() 
+
+                # Handle status codes 3xx (Redirects)
+                if 300 <= int(status) < 400:
+                    redirect = response_headers.get("location")
+                    if redirect is not None:
+                        print(f"Redirecting to: {redirect}")
+                        return self.handle_redirects(redirect, redirect_limit-1)
+
+                # Handle reading of data (creating content) 
+                if response_headers.get("transfer-encoding") == "chunked":
+                    content = self.handle_transfer_encoding(response)
+                elif "content-length" in response_headers:
+                    content_length = int(response_headers.get("content-length"))
+                    content = response.read(content_length)
+                else:
+                    s.settimeout(10.0)
+                    content = response.read()
+
+                if response_headers.get("content-encoding", "").lower() == "gzip":
                     try:
-                        content = content.decode("iso-8859-1")  # Fallback to common legacy encoding
-                    except Exception:
-                        content = content.decode("utf-8", errors="replace")  # Last resort: replace bad characters
+                        content = gzip.decompress(content)
+                    except Exception as e:
+                        return f"Error decompressing gzip content: {e}"
 
-            # Handle caching for 200 OK responses
-            cache_key = str(self)
-            if int(status) == 200:
-                max_age = self.should_cache(response_headers)
-                if max_age:
-                    URL.response_cache[cache_key] = {
-                        "headers": response_headers,
-                        "content": content,
-                        "expires": time.time() + max_age,
-                    }
+                if isinstance(content, bytes):
+                    try:
+                        content = content.decode("utf-8")
+                    except UnicodeDecodeError:
+                        try:
+                            content = content.decode("iso-8859-1")  # Fallback to common legacy encoding
+                        except Exception:
+                            content = content.decode("utf-8", errors="replace")  # Last resort: replace bad characters
 
-            # Close socket if specified by header 
-            if response_headers.get("connection") == "close":
-                key = (self.host, self.port)
-                if key in URL.open_sockets:
-                    del URL.open_sockets[key]
-                s.close()
+                # Handle caching for 200 OK responses
+                cache_key = str(self)
+                if int(status) == 200:
+                    max_age = self.should_cache(response_headers)
+                    if max_age:
+                        URL.response_cache[cache_key] = {
+                            "headers": response_headers,
+                            "content": content,
+                            "expires": time.time() + max_age,
+                        }
 
-            return content
-    
+                # Close socket if specified by header 
+                if response_headers.get("connection") == "close":
+                    key = (self.host, self.port)
+                    if key in URL.open_sockets:
+                        del URL.open_sockets[key]
+                    s.close()
+
+                return content
+        except:
+            self.set_about_blank()
+            return ""
+
     def should_cache(self, headers):
         cache_control = headers.get("cache-control")
 
@@ -312,8 +327,11 @@ class Browser:
         self.canvas.yview(*args)
     
     def get_emoji(self, char):
-        filename = "-".join(f"{ord(c):x}" for c in char) + ".png"
-        path = os.path.join("emojis", filename)
+        filename = "-".join(f"{ord(c):x}" for c in char)
+        filename = str.upper(filename)
+        filename += ".png"
+
+        path = os.path.join("OpenMoji", filename)
 
         if not os.path.exists(path):
             return None
@@ -323,7 +341,6 @@ class Browser:
             img = ImageTk.PhotoImage(resized_image)
             self.emoji_cache[path] = img
         return self.emoji_cache[path]
-
 
     def load(self, url):
         body = url.request()
@@ -339,7 +356,7 @@ class Browser:
             if y + VSTEP >= scroll_y and y <= scroll_y + HEIGHT:
                 if emoji.is_emoji(c):
                     emoji_ = self.get_emoji(c)
-                    self.canvas.create_image(x, y, image=emoji_, anchor="nw", )
+                    self.canvas.create_image(x, y, image=emoji_, anchor="nw")
                 else:
                     self.canvas.create_text(x, y, text=c, anchor="nw")
         self.canvas.config(scrollregion=(0, 0, WIDTH, self.total_height()))
@@ -379,25 +396,29 @@ def lex(body, view_source=False):
 def layout(text):
     display_list = []
     cursor_x, cursor_y = HSTEP, VSTEP
+    font_ = font.Font()
 
-    for c in text:
-        if c == "\n":
-            cursor_y += VSTEP
-        display_list.append((cursor_x, cursor_y, c))
-        cursor_x += HSTEP
-        if cursor_x >= WIDTH - HSTEP:
+    for word in text.split():
+        w = font_.measure(word)
+        if word == "\n":
             cursor_y += VSTEP
             cursor_x = HSTEP
+            continue
+        if cursor_x + w > WIDTH - HSTEP:
+            cursor_y += font_.metrics("linespace") * 1.25
+            cursor_x = HSTEP
+        display_list.append((cursor_x, cursor_y, word))
+        cursor_x += w + font_.measure(" ")
     return display_list
 
 
 if __name__ == "__main__":
     import sys
-    #if len(sys.argv) > 1 and sys.argv[1]:  # Check if URL is not empty
-    #    url = sys.argv[1]p>"
-    #else:
-    #    url = "file:///home/kevinpe/Documents/web-browser/homepage.html"
-    #load(URL(url))
-    Browser().load(URL(sys.argv[1]))
+    if len(sys.argv) > 1 and sys.argv[1]: 
+        url = sys.argv[1]
+        Browser().load(URL(url))
+    else:
+        url = "file:///home/kevinpe/Documents/web-browser/homepage.html"
+        Browser.load(URL(url))
     mainloop()
         
