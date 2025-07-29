@@ -1,12 +1,11 @@
-import html
 from tkinter import *
 from tkinter import ttk
-import tkinter.font
 import emoji
 import os
 from PIL import Image, ImageTk
 from text import Text
 from tag import Tag
+from layout import Layout
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -75,9 +74,9 @@ class Browser:
 
     def load(self, url):
         body = url.request()
-        cleaned_body = lex(body, url.is_view_source)
-        self.text = cleaned_body
-        self.display_list = layout(cleaned_body)
+        tokens = lex(body, url.is_view_source)
+        self.text = tokens
+        self.display_list = Layout(tokens, WIDTH).display_list
         self.draw()
     
     def draw(self):
@@ -103,7 +102,7 @@ class Browser:
         WIDTH = e.width
         HEIGHT = e.height
         self.canvas.config(width=WIDTH, height=HEIGHT)
-        self.display_list = layout(self.text)
+        self.display_list = Layout(self.text, WIDTH).display_list
         self.draw()
 
 def lex(body, view_source=False):
@@ -130,7 +129,7 @@ def lex(body, view_source=False):
                 
         #decoded_text = html.unescape(out)
         return out
-
+"""
 def layout(token):
     display_list = []
     cursor_x, cursor_y = HSTEP, VSTEP
@@ -165,10 +164,11 @@ def layout(token):
         elif tok.tag == "i":
             style = "italic"
         elif tok.tag == "/i":
-            syle = "roman"
+            style = "roman"
         elif tok.tag == "b":
             weight = "bold"
         elif style == "/b":
             style == "normal"
 
     return display_list
+"""
