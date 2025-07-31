@@ -17,7 +17,7 @@ class Browser:
         self.window = Tk()
         self.window.geometry(f"{WIDTH}x{HEIGHT}")
 
-        self.text=""
+        self.tokens = None
         self.display_list = []
 
         self.frame = Frame(self.window)
@@ -74,9 +74,8 @@ class Browser:
 
     def load(self, url):
         body = url.request()
-        tokens = lex(body, url.is_view_source)
-        self.text = tokens
-        self.display_list = Layout(tokens, WIDTH).display_list
+        self.tokens = lex(body, url.is_view_source)
+        self.display_list = Layout(self.tokens, WIDTH).display_list
         self.draw()
     
     def draw(self):
@@ -92,7 +91,10 @@ class Browser:
         self.canvas.config(scrollregion=(0, 0, WIDTH, self.total_height()))
 
     def scrollup(self, _):
-        self.canvas.yview_scroll(-1, "units") 
+        first,_ = self.canvas.yview()
+
+        if first > 0.0:
+            self.canvas.yview_scroll(-1, "units") 
     
     def scrolldown(self, _):
         self.canvas.yview_scroll(1, "units") 
@@ -102,12 +104,12 @@ class Browser:
         WIDTH = e.width
         HEIGHT = e.height
         self.canvas.config(width=WIDTH, height=HEIGHT)
-        self.display_list = Layout(self.text, WIDTH).display_list
+        self.display_list = Layout(self.tokens, WIDTH).display_list
         self.draw()
 
 def lex(body, view_source=False):
     if view_source:
-        return body
+        return Text(body)
     else:
         out = []
         buffer = ""
@@ -127,48 +129,4 @@ def lex(body, view_source=False):
         if not in_tag and buffer:
             out.append(Text(buffer))
                 
-        #decoded_text = html.unescape(out)
         return out
-"""
-def layout(token):
-    display_list = []
-    cursor_x, cursor_y = HSTEP, VSTEP
-
-    font = tkinter.font.Font()
-    space_width = font.measure(" ")
-    linespace = font.metrics("linespace") * 1.25
-    weight = "normal"
-    style = "roman"
-
-    width_cache = {} # To optimize loading times when resizing window and pages with large amoutn fo text.
-
-    for tok in token:
-        if isinstance(tok, Text):
-            for word in tok.text.split():
-                font = tkinter.font.Font(
-                    size = 16,
-                    weight=weight,
-                    slant=style
-                )
-                if word not in width_cache:
-                    width_cache[word] = font.measure(word)
-
-                width = width_cache[word]
-
-                if cursor_x + width >= WIDTH - HSTEP:
-                    cursor_y += linespace
-                    cursor_x = HSTEP
-                display_list.append((cursor_x, cursor_y, word, font))
-                cursor_x += width + space_width
-
-        elif tok.tag == "i":
-            style = "italic"
-        elif tok.tag == "/i":
-            style = "roman"
-        elif tok.tag == "b":
-            weight = "bold"
-        elif style == "/b":
-            style == "normal"
-
-    return display_list
-"""
