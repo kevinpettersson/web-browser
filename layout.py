@@ -21,40 +21,44 @@ class Layout:
 
         self.width_cache = {}
         
-        for tok in tokens:
-            self.recurse(tok)
+        self.recurse(tokens)
 
         self.flush()
 
-    def recurse(self, node):
-        self.token(node)
-        if hasattr(node, "children"):
-            for child in node.children:
-                self.recurse(child)
+    def recurse(self, tree):
+        if tree is None: return
 
-    def token(self, tok):
-        if isinstance(tok, Text):
-            for word in tok.text.split():
+        if isinstance(tree, Text):
+            for word in tree.text.split():
                 self.word(word)
-        elif tok.tag == "i":
+        else: 
+            self.open_tag(tree.tag)
+            for child in tree.children:
+                self.recurse(child)
+            self.close_tag(tree.tag)
+
+    def open_tag(self, tag):
+        if tag == "i":
             self.style = "italic"
-        elif tok.tag == "/i":
-            self.style = "roman"
-        elif tok.tag == "b":
+        elif tag == "b":
             self.weight = "bold"
-        elif tok.tag == "/b":
-            self.weight = "normal"
-        elif tok.tag == "small":
+        elif tag == "small":
             self.size -= 2
-        elif tok.tag == "/small":
-            self.size += 2
-        elif tok.tag == "big":
+        elif tag == "big":
             self.size += 4
-        elif tok.tag == "/big":
-            self.size -= 4
-        elif tok.tag == "br":
+        elif tag == "br":
             self.flush()
-        elif tok.tag == "/p":
+    
+    def close_tag(self, tag):
+        if tag == "i":
+            self.style = "roman"
+        elif tag == "b":
+            self.weight = "normal"
+        elif tag == "small":
+            self.size += 2
+        elif tag == "big":
+            self.size -= 4
+        elif tag == "p":
             self.cursor_y += VSTEP
             self.flush()
 

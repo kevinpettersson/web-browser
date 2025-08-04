@@ -18,7 +18,6 @@ class Browser:
         self.window = Tk()
         self.window.geometry(f"{WIDTH}x{HEIGHT}")
 
-        self.tokens = None
         self.display_list = []
 
         self.frame = Frame(self.window)
@@ -75,10 +74,8 @@ class Browser:
 
     def load(self, url):
         body = url.request()
-        parser = HTMLParser(body, url.is_view_source)
-        root = parser.parse()
-        self.tokens = root.children
-        self.display_list = Layout(self.tokens, WIDTH).display_list
+        self.nodes = HTMLParser(body, url.is_view_source).parse()
+        self.display_list = Layout(self.nodes, WIDTH).display_list
         self.draw()
     
     def draw(self):
@@ -107,30 +104,5 @@ class Browser:
         WIDTH = e.width
         HEIGHT = e.height
         self.canvas.config(width=WIDTH, height=HEIGHT)
-        self.display_list = Layout(self.tokens, WIDTH).display_list
+        self.display_list = Layout(self.nodes, WIDTH).display_list
         self.draw()
-"""
-def lex(body, view_source=False):
-    if view_source:
-        return Text(body)
-    else:
-        out = []
-        buffer = ""
-        in_tag = False
-
-        for c in body:
-            if c == "<":
-                in_tag = True
-                if buffer: out.append(Text(buffer))
-                buffer = ""
-            elif c == ">":
-                in_tag = False
-                out.append(Element(buffer))
-                buffer = ""
-            else:
-                buffer += c
-        if not in_tag and buffer:
-            out.append(Text(buffer))
-                
-        return out
-"""
