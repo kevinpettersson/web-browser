@@ -4,8 +4,9 @@ import emoji
 import os
 from PIL import Image, ImageTk
 from text import Text
-from tag import Tag
+from element import Element
 from layout import Layout
+from html_parser import HTMLParser
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -74,7 +75,9 @@ class Browser:
 
     def load(self, url):
         body = url.request()
-        self.tokens = lex(body, url.is_view_source)
+        parser = HTMLParser(body, url.is_view_source)
+        root = parser.parse()
+        self.tokens = root.children
         self.display_list = Layout(self.tokens, WIDTH).display_list
         self.draw()
     
@@ -106,7 +109,7 @@ class Browser:
         self.canvas.config(width=WIDTH, height=HEIGHT)
         self.display_list = Layout(self.tokens, WIDTH).display_list
         self.draw()
-
+"""
 def lex(body, view_source=False):
     if view_source:
         return Text(body)
@@ -122,7 +125,7 @@ def lex(body, view_source=False):
                 buffer = ""
             elif c == ">":
                 in_tag = False
-                out.append(Tag(buffer))
+                out.append(Element(buffer))
                 buffer = ""
             else:
                 buffer += c
@@ -130,3 +133,4 @@ def lex(body, view_source=False):
             out.append(Text(buffer))
                 
         return out
+"""
