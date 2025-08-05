@@ -1,17 +1,18 @@
 from text import Text
 from element import Element
 
-SELF_CLOSING_TAGS = [
+class HTMLParser:
+
+    SELF_CLOSING_TAGS = [
     "area", "base", "br", "col", "embed", "hr", "img", "input",
     "link", "meta", "param", "source", "track", "wbr",
     ]   
 
-HEAD_TAGS = [
-    "base", "basefont", "bgsound", "noscript", "link",
-    "meta", "title", "style", "script",
-]
+    HEAD_TAGS = [
+        "base", "basefont", "bgsound", "noscript", "link",
+        "meta", "title", "style", "script",
+    ]
 
-class HTMLParser:
     def __init__(self, body, is_view_source):
         self.body = body
         self.unfinished = []
@@ -25,18 +26,17 @@ class HTMLParser:
                 self.add_tag("html")
 
             elif open_tags == ["html"] and tag not in ["head", "body", "/html"]:
-                if tag in HEAD_TAGS:
+                if tag in self.HEAD_TAGS:
                     self.add_tag("head")
 
                 else:
                     self.add_tag("body")
 
-            elif open_tags == ["html", "head"] and tag not in ["/head"] + HEAD_TAGS:
+            elif open_tags == ["html", "head"] and tag not in ["/head"] + self.HEAD_TAGS:
                 self.add_tag("/head")
 
             else:
                 break
-
 
     def finish(self):
         if not self.unfinished:
@@ -69,7 +69,7 @@ class HTMLParser:
             parent = self.unfinished[-1]
             parent.children.append(node)
 
-        elif tag in SELF_CLOSING_TAGS:
+        elif tag in self.SELF_CLOSING_TAGS:
             parent = self.unfinished[-1] 
             node = Element(tag, attributes, parent)
             if parent:

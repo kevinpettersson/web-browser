@@ -3,9 +3,7 @@ from tkinter import ttk
 import emoji
 import os
 from PIL import Image, ImageTk
-from text import Text
-from element import Element
-from layout import Layout
+from layout import DocumentLayout
 from html_parser import HTMLParser
 
 WIDTH, HEIGHT = 800, 600
@@ -16,7 +14,9 @@ class Browser:
 
     def __init__(self):
         self.window = Tk()
-        self.window.geometry(f"{WIDTH}x{HEIGHT}")
+        self.width = 800
+        self.height = 600
+        self.window.geometry(f"{self.width}x{self.height}")
 
         self.display_list = []
 
@@ -32,8 +32,8 @@ class Browser:
 
         self.canvas = Canvas(
             self.frame,
-            width=WIDTH,
-            height=HEIGHT,
+            width=self.width,
+            height=self.height,
             yscrollincrement=SCROLL_STEP
         )
         self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
@@ -51,7 +51,7 @@ class Browser:
     def total_height(self):
         if self.display_list:
             return self.display_list[-1][1] + VSTEP
-        return HEIGHT
+        return self.height
 
     def on_scrollbar(self, *args):
         self.canvas.yview(*args)
@@ -75,20 +75,22 @@ class Browser:
     def load(self, url):
         body = url.request()
         self.nodes = HTMLParser(body, url.is_view_source).parse()
-        self.display_list = Layout(self.nodes, WIDTH).display_list
+        self.document = DocumentLayout(self.nodes, self.width)
+        self.document.layout()
+        self.display_list = self.document.display_list
         self.draw()
     
     def draw(self):
         self.canvas.delete("all")
         scroll_y = self.canvas.canvasy(0)
         for x, y, c, f in self.display_list:
-            if y + VSTEP >= scroll_y and y <= scroll_y + HEIGHT:
+            if y + VSTEP >= scroll_y and y <= scroll_y + self.height:
                 if emoji.is_emoji(c):
                     emoji_ = self.get_emoji(c)
                     self.canvas.create_image(x, y, image=emoji_, anchor="nw")
                 else:
                     self.canvas.create_text(x, y, text=c, anchor="nw", font=f)
-        self.canvas.config(scrollregion=(0, 0, WIDTH, self.total_height()))
+        self.canvas.config(scrollregion=(0, 0, self.width, self.total_height()))
 
     def scrollup(self, _):
         first,_ = self.canvas.yview()
@@ -100,9 +102,11 @@ class Browser:
         self.canvas.yview_scroll(1, "units") 
 
     def resize(self, e):
-        global WIDTH, HEIGHT
-        WIDTH = e.width
-        HEIGHT = e.height
-        self.canvas.config(width=WIDTH, height=HEIGHT)
-        self.display_list = Layout(self.nodes, WIDTH).display_list
+        self.width = e.width
+        self.height = e.height
+        self.canvas.config(width=e.width, height=e.height)
+
+        self.document = DocumentLayout(self.nodes, self.width)
+        self.document.layout()
+        self.display_list = self.document.display_list
         self.draw()
