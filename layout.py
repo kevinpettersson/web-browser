@@ -1,6 +1,7 @@
 import tkinter.font
 from text import Text
 from element import Element
+from draw import DrawRect, DrawText
 
 HSTEP, VSTEP = 13, 18
 FONTS = {}
@@ -146,13 +147,16 @@ class BlockLayout:
         max_descent = max([metric["descent"] for metric in metrics])
         self.cursor_y = baseline + 1.25 * max_descent
 
-def get_font(size, weight, style):
-    key = (size, weight, style)
-    if key not in FONTS:
-        font = tkinter.font.Font(size=size, weight=weight, slant=style)
-        label = tkinter.Label(font=font)
-        FONTS[key] = (font, label)
-    return FONTS[key][0]
+    def paint(self):
+        cmds = []
+        if self.layout_mode() == "inline":
+            if isinstance(self.node, Element) and self.node.tag == "pre":
+                x2, y2 = self.x + self.width, self.y + self.height
+                rect = DrawRect(self.x, self.y, x2, y2, "gray")
+                cmds.append(rect)
+            for x, y, word, font in self.display_list:
+                cmds.append(DrawText(x, y, word, font))
+        return cmds
 
 class DocumentLayout:
     def __init__(self, node, width):
@@ -160,8 +164,6 @@ class DocumentLayout:
         self.parent = None
         self.children = []
         self.layout_width = width
-
-        self.display_list = []
 
     def layout(self):
         self.width = self.layout_width - (2 * HSTEP)
@@ -173,4 +175,20 @@ class DocumentLayout:
         child.layout()
 
         self.height = child.height
-        self.display_list = child.display_list
+    
+    def paint(self):
+        return []
+
+def paint_tree(layout_object, display_list):
+    display_list.extend(layout_object.paint())
+
+    for child in layout_object.children:
+        paint_tree(child, display_list)
+
+def get_font(size, weight, style):
+    key = (size, weight, style)
+    if key not in FONTS:
+        font = tkinter.font.Font(size=size, weight=weight, slant=style)
+        label = tkinter.Label(font=font)
+        FONTS[key] = (font, label)
+    return FONTS[key][0]

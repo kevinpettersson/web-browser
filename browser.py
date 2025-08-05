@@ -3,7 +3,7 @@ from tkinter import ttk
 import emoji
 import os
 from PIL import Image, ImageTk
-from layout import DocumentLayout
+from layout import DocumentLayout, paint_tree
 from html_parser import HTMLParser
 
 WIDTH, HEIGHT = 800, 600
@@ -17,8 +17,6 @@ class Browser:
         self.width = 800
         self.height = 600
         self.window.geometry(f"{self.width}x{self.height}")
-
-        self.display_list = []
 
         self.frame = Frame(self.window)
         self.frame.pack(fill=BOTH, expand=True)
@@ -50,7 +48,7 @@ class Browser:
 
     def total_height(self):
         if self.display_list:
-            return self.display_list[-1][1] + VSTEP
+            return self.display_list[-1].top + VSTEP
         return self.height
 
     def on_scrollbar(self, *args):
@@ -76,21 +74,21 @@ class Browser:
         body = url.request()
         self.nodes = HTMLParser(body, url.is_view_source).parse()
         self.document = DocumentLayout(self.nodes, self.width)
+
         self.document.layout()
-        self.display_list = self.document.display_list
-        self.draw()
-    
-    def draw(self):
+        self.display_list = []
+        paint_tree(self.document, self.display_list)
+        
         self.canvas.delete("all")
-        scroll_y = self.canvas.canvasy(0)
-        for x, y, c, f in self.display_list:
-            if y + VSTEP >= scroll_y and y <= scroll_y + self.height:
-                if emoji.is_emoji(c):
-                    emoji_ = self.get_emoji(c)
-                    self.canvas.create_image(x, y, image=emoji_, anchor="nw")
-                else:
-                    self.canvas.create_text(x, y, text=c, anchor="nw", font=f)
+
+        for cmd in self.display_list:
+            cmd.execute(0, self.canvas)  
+
+        self.draw()
+
+    def draw(self):
         self.canvas.config(scrollregion=(0, 0, self.width, self.total_height()))
+
 
     def scrollup(self, _):
         first,_ = self.canvas.yview()
@@ -99,7 +97,7 @@ class Browser:
             self.canvas.yview_scroll(-1, "units") 
     
     def scrolldown(self, _):
-        self.canvas.yview_scroll(1, "units") 
+        self.canvas.yview_scroll(1, "units")
 
     def resize(self, e):
         self.width = e.width
@@ -108,5 +106,10 @@ class Browser:
 
         self.document = DocumentLayout(self.nodes, self.width)
         self.document.layout()
-        self.display_list = self.document.display_list
+        self.display_list = []
+        paint_tree(self.document, self.display_list)
+
+        self.canvas.delete("all")
+        for cmd in self.display_list:
+            cmd.execute(0, self.canvas)
         self.draw()
