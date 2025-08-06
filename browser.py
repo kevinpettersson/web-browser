@@ -5,6 +5,7 @@ import os
 from PIL import Image, ImageTk
 from layout import DocumentLayout, paint_tree
 from html_parser import HTMLParser
+from css_parser import style
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -73,8 +74,8 @@ class Browser:
     def load(self, url):
         body = url.request()
         self.nodes = HTMLParser(body, url.is_view_source).parse()
-        self.document = DocumentLayout(self.nodes, self.width)
-
+        self.document = DocumentLayout(self.nodes, self.width) # create DocumentLayout object, is parent to all BlockLayout's
+        style(self.nodes) #store style information to each node
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
