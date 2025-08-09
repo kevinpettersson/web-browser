@@ -5,7 +5,9 @@ import os
 from PIL import Image, ImageTk
 from layout import DocumentLayout, paint_tree
 from html_parser import HTMLParser
-from css_parser import style
+from css_parser import CSSParser,style, tree_to_list
+from element import Element
+from tag_selector import cascade_priority, TagSelector
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -33,7 +35,8 @@ class Browser:
             self.frame,
             width=self.width,
             height=self.height,
-            yscrollincrement=SCROLL_STEP
+            yscrollincrement=SCROLL_STEP,
+            bg="white",
         )
         self.canvas.pack(side=LEFT, fill=BOTH, expand=True)
 
@@ -43,9 +46,11 @@ class Browser:
         self.window.bind("<Up>", self.scrollup)
         self.window.bind("<Button-4>", self.scrollup)
         self.window.bind("<Button-5>", self.scrolldown)
-        self.window.bind("<Configure>", self.resize)
+        #self.window.bind("<Configure>", self.resize)
 
         self.emoji_cache = {}
+        self.rules = []
+        self.DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
 
     def total_height(self):
         if self.display_list:
@@ -74,8 +79,31 @@ class Browser:
     def load(self, url):
         body = url.request()
         self.nodes = HTMLParser(body, url.is_view_source).parse()
+
+        # 1. Copy over the browsers default style-sheet
+        #self.rules = self.DEFAULT_STYLE_SHEET.copy()
+        self.rules = self.DEFAULT_STYLE_SHEET.copy()
+        # 2. Find and load external stylesheets
+        links = [node.attributes["href"]
+            for node in tree_to_list(self.nodes, [])
+            if isinstance(node, Element) 
+            and node.tag == "link"
+            and node.attributes.get("rel") == "stylesheet"
+            and "href" in node.attributes]
+        
+        # 3. For each link, resolve the CSS rule and append it to rules
+        for link in links:
+            style_url = url.resolve(link)
+            try:
+                body = style_url.request()
+            except:
+                continue
+            self.rules.extend(CSSParser(body).parse())
+
+        # 4. Apply all the CSS rules (default + external) to the DOM 
+        style(self.nodes, sorted(self.rules, key=cascade_priority)) #store style information to each node
+
         self.document = DocumentLayout(self.nodes, self.width) # create DocumentLayout object, is parent to all BlockLayout's
-        style(self.nodes) #store style information to each node
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
@@ -84,12 +112,11 @@ class Browser:
 
         for cmd in self.display_list:
             cmd.execute(0, self.canvas)  
-
+        
         self.draw()
 
     def draw(self):
         self.canvas.config(scrollregion=(0, 0, self.width, self.total_height()))
-
 
     def scrollup(self, _):
         first,_ = self.canvas.yview()
@@ -99,12 +126,12 @@ class Browser:
     
     def scrolldown(self, _):
         self.canvas.yview_scroll(1, "units")
-
+"""
     def resize(self, e):
         self.width = e.width
         self.height = e.height
         self.canvas.config(width=e.width, height=e.height)
-
+        
         self.document = DocumentLayout(self.nodes, self.width)
         self.document.layout()
         self.display_list = []
@@ -114,3 +141,4 @@ class Browser:
         for cmd in self.display_list:
             cmd.execute(0, self.canvas)
         self.draw()
+"""
