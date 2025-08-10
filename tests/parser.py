@@ -1,4 +1,4 @@
-from css_parser import CSSParser
+from src.css_parser import CSSParser
 
 if __name__ == "__main__":
     css = """

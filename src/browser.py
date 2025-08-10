@@ -3,11 +3,11 @@ from tkinter import ttk
 import emoji
 import os
 from PIL import Image, ImageTk
-from layout import DocumentLayout, paint_tree
-from html_parser import HTMLParser
-from css_parser import CSSParser,style, tree_to_list
-from element import Element
-from tag_selector import cascade_priority, TagSelector
+from .layout import DocumentLayout, paint_tree
+from .html_parser import HTMLParser
+from .css_parser import CSSParser,style, tree_to_list
+from .element import Element
+from .tag_selector import cascade_priority
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -46,7 +46,7 @@ class Browser:
         self.window.bind("<Up>", self.scrollup)
         self.window.bind("<Button-4>", self.scrollup)
         self.window.bind("<Button-5>", self.scrolldown)
-        #self.window.bind("<Configure>", self.resize)
+        self.window.bind("<Configure>", self.resize)
 
         self.emoji_cache = {}
         self.rules = []
@@ -126,7 +126,7 @@ class Browser:
     
     def scrolldown(self, _):
         self.canvas.yview_scroll(1, "units")
-"""
+
     def resize(self, e):
         self.width = e.width
         self.height = e.height
@@ -141,4 +141,3 @@ class Browser:
         for cmd in self.display_list:
             cmd.execute(0, self.canvas)
         self.draw()
-"""

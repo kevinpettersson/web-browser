@@ -1,5 +1,5 @@
-from element import Element
-from tag_selector import TagSelector, DescendantSelector
+from .element import Element
+from .tag_selector import TagSelector, DescendantSelector
 
 INHERITED_PROPERTIES = {
     "font-size": "16px",

@@ -1,5 +1,5 @@
-from text import Text
-from element import Element
+from .text import Text
+from .element import Element
 
 class HTMLParser:
 

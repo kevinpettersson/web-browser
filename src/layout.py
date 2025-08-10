@@ -1,7 +1,7 @@
 import tkinter.font
-from text import Text
-from element import Element
-from draw import DrawRect, DrawText
+from .text import Text
+from .element import Element
+from .draw import DrawRect, DrawText
 
 HSTEP, VSTEP = 13, 18
 FONTS = {}

@@ -1,5 +1,5 @@
-from url import URL
-from html_parser import HTMLParser, print_tree
+from src.url import URL
+from src.html_parser import HTMLParser, print_tree
 import sys
 
 if __name__ == "__main__":
