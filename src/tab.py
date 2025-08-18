@@ -49,7 +49,7 @@ class Tab:
             self.emoji_cache[path] = img
         return self.emoji_cache[path]
 
-    def load(self, url):
+    def load(self, url, canvas):
         self.url = url
         body = url.request()
         self.nodes = HTMLParser(body, url.is_view_source).parse()
@@ -82,39 +82,39 @@ class Tab:
         self.display_list = []
         paint_tree(self.document, self.display_list)
         
-        self.canvas.delete("all")
+        canvas.delete("all")
 
         for cmd in self.display_list:
-            cmd.execute(0, self.canvas)  
+            cmd.execute(0, canvas)  
 
     def draw(self, canvas):
         canvas.config(scrollregion=(0, 0, self.width, self.total_height()))
 
-    def scrollup(self):
-        first,_ = self.canvas.yview()
+    def scrollup(self, canvas):
+        first,_ = canvas.yview()
 
         if first > 0.0:
-            self.canvas.yview_scroll(-1, "units") 
+            canvas.yview_scroll(-1, "units") 
     
-    def scrolldown(self):
-        self.canvas.yview_scroll(1, "units")
+    def scrolldown(self, canvas):
+        canvas.yview_scroll(1, "units")
 
-    def resize(self, width, height):
+    def resize(self, width, height, canvas):
 
-        self.canvas.config(width=width, height=height)
-        
+        canvas.config(width=width, height=height)
+
         self.document = DocumentLayout(self.nodes, width)
         self.document.layout()
         self.display_list = []
         paint_tree(self.document, self.display_list)
 
-        self.canvas.delete("all")
+        canvas.delete("all")
         for cmd in self.display_list:
-            cmd.execute(0, self.canvas)
-        self.draw()
+            cmd.execute(0, canvas)
+        self.draw(canvas)
     
-    def click(self, x, y):
-        y += self.canvas.canvasy(0)
+    def click(self, x, y, canvas):
+        y += canvas.canvasy(0)
 
         objs = [obj for obj in tree_to_list(self.document, [])
                     if obj.x <= x < obj.x + obj.width

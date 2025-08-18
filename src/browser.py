@@ -44,20 +44,20 @@ class Browser:
         self.window.bind("<Button-1>", self.handle_click)
 
     def handle_click(self, e):
-        self.active_tab.click(e.x, e.y)
+        self.active_tab.click(e.x, e.y, self.canvas)
         self.draw()
     
     def handle_down(self, _):
-        self.active_tab.scrolldown()
+        self.active_tab.scrolldown(self.canvas)
         self.draw()
     
     def handle_up(self, _):
-        self.active_tab.scrollup()
+        self.active_tab.scrollup(self.canvas)
         self.draw()
     
     def handle_resize(self, _):
-        for tab in self.active_tab:
-            tab.resize()
+        for tab in self.tabs:
+            tab.resize(self.width, self.height, self.canvas)
     
     def on_scrollbar(self, *args):
         self.canvas.yview(*args)
@@ -68,7 +68,7 @@ class Browser:
     
     def new_tab(self, url):
         new_tab = Tab(self.width, self.height)
-        new_tab.load(url)
+        new_tab.load(url, self.canvas)
         self.active_tab = new_tab
         self.tabs.append(new_tab)
         self.draw()
