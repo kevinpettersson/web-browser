@@ -4,11 +4,12 @@ from tkinter import *
 
 if __name__ == "__main__":
     import sys
-    if len(sys.argv) > 1 and sys.argv[1]: 
-        url = sys.argv[1]
-    else:
-        url = "file:///home/kevinpe/Documents/web-browser/homepage.html"
-        
     browser = Browser()
+    browser.new_tab(URL(sys.argv[1]))
+    browser.window.mainloop()
+
+    """    
+    browser = Tab()
     browser.load(URL(url))    
     browser.window.mainloop()
+    """
