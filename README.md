@@ -1,12 +1,12 @@
-# web-browser
+# Super simplified web browser 
 
-### Simplified web browser which is currently in the works.
+## Supports the following:
 * Client-server connection over IP/TCP  
 * Supports URL schemes such as http, https, data, file, and view-source.  
 * HTTP response caching, redirects.  
 * GUI with scrolling and resizing.
-* HTML Parser
-* CSS Parser
+* Basic HTML parser
+* Basic CSS parser
 
 ## How to run the application: 
 
